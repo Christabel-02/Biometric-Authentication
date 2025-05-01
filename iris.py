@@ -1,7 +1,4 @@
-
-            
-      
-    import os
+import os
 import zipfile
 import io
 import cv2
@@ -94,3 +91,10 @@ if uploaded_file is not None:
             st.image(image.squeeze(), caption=f"True: {true_class} | Predicted: {pred_class}", width=200)
 else:
     st.info("👈 Upload the MMU ZIP dataset to begin.")
+
+            
+      
+  
+   
+    
+       
