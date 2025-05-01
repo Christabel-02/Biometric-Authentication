@@ -13,9 +13,9 @@ from sklearn.model_selection import train_test_split
 IMG_SIZE = 128
 
 # Upload and extract ZIP
-st.title("👁️ Iris Recognition with Uploaded Dataset")
+st.title("👁️  Biometric Authentication")
 
-uploaded_file = st.sidebar.file_uploader("📂 Upload MMU ZIP file", type=['zip'])
+uploaded_file = st.sidebar.file_uploader("📂 Upload your ZIP file", type=['zip'])
 
 def load_dataset_from_zip(zip_file):
     X, y = [], []
