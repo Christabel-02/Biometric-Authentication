@@ -1,6 +1,5 @@
 import os
 import zipfile
-import io
 import cv2
 import numpy as np
 import streamlit as st
@@ -12,30 +11,35 @@ from sklearn.model_selection import train_test_split
 
 IMG_SIZE = 128
 
-# Upload and extract ZIP
-st.title("👁️  Biometric Authentication")
+st.title("👁️ Biometric Authentication")
 
-uploaded_file = st.sidebar.file_uploader("📂 Upload your ZIP file", type=['zip'])
+uploaded_file = st.sidebar.file_uploader("📂 Upload a ZIP file of labeled image folders", type=['zip'])
 
 def load_dataset_from_zip(zip_file):
     X, y = [], []
     with zipfile.ZipFile(zip_file) as archive:
         archive.extractall("uploaded_dataset")
 
-    for person_id in sorted(os.listdir("uploaded_dataset/MMU-Iris-Database/")):
-        person_path = os.path.join("uploaded_dataset/MMU-Iris-Database", person_id)
-        if not os.path.isdir(person_path): continue
-        for eye in ['left', 'right']:
-            eye_path = os.path.join(person_path, eye)
-            if not os.path.exists(eye_path): continue
-            for img_name in os.listdir(eye_path):
-                if not img_name.endswith('.bmp'): continue
-                img_path = os.path.join(eye_path, img_name)
-                img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-                if img is None: continue
-                img = cv2.resize(img, (IMG_SIZE, IMG_SIZE))
-                X.append(img)
-                y.append(int(person_id))
+    base_path = "uploaded_dataset"
+
+    for root, dirs, files in os.walk(base_path):
+        for file in files:
+            if not file.lower().endswith(('.bmp', '.jpg', '.jpeg', '.png')): continue
+            img_path = os.path.join(root, file)
+            label = os.path.basename(os.path.dirname(root))  # Parent folder as label
+            try:
+                label_int = int(label)
+            except ValueError:
+                label_int = hash(label) % (10**8)  # hash label if not integer
+            img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+            if img is None: continue
+            img = cv2.resize(img, (IMG_SIZE, IMG_SIZE))
+            X.append(img)
+            y.append(label_int)
+
+    if not X:
+        return np.array([]), np.array([]), np.array([])
+
     X = np.array(X, dtype="float32") / 255.0
     y = np.array(y)
     X = np.expand_dims(X, -1)
@@ -44,9 +48,9 @@ def load_dataset_from_zip(zip_file):
 
 def build_model(num_classes):
     model = Sequential([
-        Conv2D(32, (3,3), activation='relu', input_shape=(IMG_SIZE, IMG_SIZE, 1)),
+        Conv2D(32, (3, 3), activation='relu', input_shape=(IMG_SIZE, IMG_SIZE, 1)),
         MaxPooling2D(),
-        Conv2D(64, (3,3), activation='relu'),
+        Conv2D(64, (3, 3), activation='relu'),
         MaxPooling2D(),
         Flatten(),
         Dense(128, activation='relu'),
@@ -56,25 +60,25 @@ def build_model(num_classes):
     return model
 
 if uploaded_file is not None:
-    with st.spinner("Extracting and loading images..."):
+    with st.spinner("📦 Extracting and loading images..."):
         X, y_cat, y = load_dataset_from_zip(uploaded_file)
 
     if X.size == 0:
-        st.error("❌ No images found in the uploaded ZIP.")
+        st.error("❌ No valid images found in the uploaded ZIP.")
     else:
         st.success(f"✅ Loaded {len(X)} images.")
 
         X_train, X_test, y_train, y_test = train_test_split(X, y_cat, test_size=0.2, random_state=42)
 
-        st.sidebar.title("🧪 Augmentation")
+        st.sidebar.title("🧪 Augmentation Options")
         apply_aug = st.sidebar.checkbox("Apply Rotation (±15°)")
         datagen = ImageDataGenerator(rotation_range=15 if apply_aug else 0)
         datagen.fit(X_train)
 
         model = build_model(num_classes=y_cat.shape[1])
 
-        if st.button("Train Model"):
-            with st.spinner("Training..."):
+        if st.button("🚀 Train Model"):
+            with st.spinner("Training in progress..."):
                 model.fit(datagen.flow(X_train, y_train, batch_size=32),
                           epochs=10,
                           validation_data=(X_test, y_test),
@@ -83,18 +87,11 @@ if uploaded_file is not None:
             st.success(f"✅ Model trained. Accuracy: {acc:.2%}")
 
         st.markdown("### 🔍 Test on a Random Image")
-        if st.button("Pick and Predict"):
+        if st.button("🎲 Pick and Predict"):
             idx = np.random.randint(len(X_test))
             image = X_test[idx]
             true_class = np.argmax(y_test[idx])
             pred_class = np.argmax(model.predict(image[np.newaxis, ...]))
             st.image(image.squeeze(), caption=f"True: {true_class} | Predicted: {pred_class}", width=200)
 else:
-    st.info("👈 Upload the MMU ZIP dataset to begin.")
-
-            
-      
-  
-   
-    
-       
+    st.info("👈 Upload a ZIP file containing folders of images (one folder per class) to begin.")
